@@ -1,0 +1,110 @@
+{
+  "basis": "GitHub daily Trending 滚动榜；抓取时刻快照，不代表北京时间自然日精确增量",
+  "content_hash": "4ec0fd9396684ba5c57ea8f70288762da00a7ccac43e8c107ecce6a7f20b00ef",
+  "entries": [
+    {
+      "chinese_description": "用于漏洞挖掘和外部红队工作的Claude Code技能包——84项技能、15个斜杠命令、681个披露报告模式（涵盖24个核心漏洞类别），以及企业身份+基础设施攻击矩阵。",
+      "full_name": "elementalsouls/Claude-BugHunter",
+      "language": "Python",
+      "original_description": "A Claude Code skill bundle for bug hunting and external red-team work - 84 skills, 15 slash commands, 681 disclosed-report patterns curated across 24 core vulnerability classes, plus enterprise identity + infrastructure attack matrices.",
+      "rank": 1,
+      "stars": 22287,
+      "stars_today": 1644,
+      "url": "https://github.com/elementalsouls/Claude-BugHunter"
+    },
+    {
+      "chinese_description": "一个行之有效的代理技能框架和软件开发方法。",
+      "full_name": "obra/superpowers",
+      "language": "Shell",
+      "original_description": "An agentic skills framework & software development methodology that works.",
+      "rank": 2,
+      "stars": 326245,
+      "stars_today": 902,
+      "url": "https://github.com/obra/superpowers"
+    },
+    {
+      "chinese_description": "“CLI-Anything：让所有软件都具备原生代理功能” -- CLI-Hub：https://clianything.cc/",
+      "full_name": "HKUDS/CLI-Anything",
+      "language": "Python",
+      "original_description": "\"CLI-Anything: Making ALL Software Agent-Native\" -- CLI-Hub: https://clianything.cc/",
+      "rank": 3,
+      "stars": 65348,
+      "stars_today": 1094,
+      "url": "https://github.com/HKUDS/CLI-Anything"
+    },
+    {
+      "chinese_description": "🧠 两小时从 0 训出你的 64M 大模型。Train your own 64M LLM from scratch in 2 hours.",
+      "full_name": "jingyaogong/minimind",
+      "language": "Python",
+      "original_description": "🧠 两小时从 0 训出你的 64M 大模型。Train your own 64M LLM from scratch in 2 hours.",
+      "rank": 4,
+      "stars": 70743,
+      "stars_today": 828,
+      "url": "https://github.com/jingyaogong/minimind"
+    },
+    {
+      "chinese_description": "Cursor 插件规范和官方插件",
+      "full_name": "cursor/plugins",
+      "language": "TypeScript",
+      "original_description": "Cursor plugin specification and official plugins",
+      "rank": 5,
+      "stars": 19417,
+      "stars_today": 408,
+      "url": "https://github.com/cursor/plugins"
+    },
+    {
+      "chinese_description": "让您的客服代表更聪明的知识基础设施。通过一个 API 搜索、抓取和访问 550 多个数据提供商。",
+      "full_name": "firecrawl/firecrawl",
+      "language": "TypeScript",
+      "original_description": "Knowledge infrastructure to make your agents smarter. Search, scrape and access 550+ data providers through one API.",
+      "rank": 6,
+      "stars": 209549,
+      "stars_today": 1131,
+      "url": "https://github.com/firecrawl/firecrawl"
+    },
+    {
+      "chinese_description": "官方 NGINX 开源代码仓库。",
+      "full_name": "nginx/nginx",
+      "language": "C",
+      "original_description": "The official NGINX Open Source repository.",
+      "rank": 7,
+      "stars": 33301,
+      "stars_today": 174,
+      "url": "https://github.com/nginx/nginx"
+    },
+    {
+      "chinese_description": "OpenVINO™ 是一款用于优化和部署 AI 推理的开源工具包",
+      "full_name": "openvinotoolkit/openvino",
+      "language": "C++",
+      "original_description": "OpenVINO™ is an open source toolkit for optimizing and deploying AI inference",
+      "rank": 8,
+      "stars": 12571,
+      "stars_today": 188,
+      "url": "https://github.com/openvinotoolkit/openvino"
+    },
+    {
+      "chinese_description": "适用于 Claude Code、Codex、GitHub Copilot、Cursor、Factory Droid、Qoder 和 Pi 的编辑图表设计。52 种图表类型。自包含的 HTML + SVG。无阴影。无Mermaid杂乱。",
+      "full_name": "cathrynlavery/diagram-design",
+      "language": "HTML",
+      "original_description": "Editorial diagram design for Claude Code, Codex, GitHub Copilot, Cursor, Factory Droid, Qoder, and Pi. 52 diagram types. Self-contained HTML + SVG. No shadows. No Mermaid slop.",
+      "rank": 9,
+      "stars": 72579,
+      "stars_today": 1133,
+      "url": "https://github.com/cathrynlavery/diagram-design"
+    },
+    {
+      "chinese_description": "一种 AI 代理技能，可在 Reddit、X、YouTube、HN、Polymarket 和网络上研究任何主题，然后综合生成有事实依据的摘要",
+      "full_name": "mvanhorn/last30days-skill",
+      "language": "Python",
+      "original_description": "AI agent skill that researches any topic across Reddit, X, YouTube, HN, Polymarket, and the web - then synthesizes a grounded summary",
+      "rank": 10,
+      "stars": 74750,
+      "stars_today": 950,
+      "url": "https://github.com/mvanhorn/last30days-skill"
+    }
+  ],
+  "fetched_at": "2026-11-25T20:51:55.997535+08:00",
+  "source": "github-trending",
+  "target_date": "2026-11-25",
+  "warnings": []
+}
