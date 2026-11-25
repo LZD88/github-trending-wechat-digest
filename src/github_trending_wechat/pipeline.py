@@ -72,7 +72,11 @@ class DigestApplication:
 
     def run(self, explicit_date: date | None = None) -> RunOutcome:
         service = self._require_delivery_service()
-        snapshot, changed = self.generate(explicit_date, save=True)
+        target_date = target_date_for_run(self.now(), explicit_date)
+        snapshot = self.digest_store.load(target_date)
+        changed = False
+        if snapshot is None or not service.already_delivered(snapshot):
+            snapshot, changed = self.generate(target_date, save=True)
         rendered = render_digest(snapshot)
         attempt = service.deliver(snapshot, rendered)
         return RunOutcome(snapshot, rendered, attempt, changed)

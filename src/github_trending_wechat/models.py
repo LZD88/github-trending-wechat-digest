@@ -104,22 +104,31 @@ class DeliveryAttempt:
                 self.provider,
                 self.recipient_fingerprint,
                 self.target_date.isoformat(),
-                self.content_hash,
             ]
         )
         return sha256(raw.encode("utf-8")).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
-        data = asdict(self)
-        data["target_date"] = self.target_date.isoformat()
-        data["attempted_at"] = self.attempted_at.isoformat()
-        data["idempotency_key"] = self.idempotency_key
-        return data
+        # Delivery records are committed to the repository, which may be public.
+        return {
+            "provider": self.provider,
+            "recipient_fingerprint": self.recipient_fingerprint,
+            "target_date": self.target_date.isoformat(),
+            "status": self.status,
+            "attempted_at": self.attempted_at.isoformat(),
+            "attempt_count": self.attempt_count,
+            "error_class": self.error_class,
+            "reason": self.reason,
+            "related_attempt_key": self.related_attempt_key,
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
         values = dict(data)
         values.pop("idempotency_key", None)
+        values.pop("message_ids", None)
+        values.pop("error_message", None)
+        values["content_hash"] = ""
         values["target_date"] = date.fromisoformat(values["target_date"])
         values["attempted_at"] = datetime.fromisoformat(values["attempted_at"])
         return cls(**values)

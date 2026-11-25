@@ -46,7 +46,7 @@ GitHub 没有官方 Trending API，也不提供严格的“昨日自然日榜”
 
 - `TrendingEntry`：排名、仓库全名、URL、原简介、中文简介、语言、总 Star、日榜新增 Star；
 - `DigestSnapshot`：目标榜期、抓取时间、数据源、口径、条目集合和内容摘要值；
-- `DeliveryAttempt`：提供方、脱敏接收配置标识、榜期、内容摘要值、尝试次数、最终状态、服务方消息标识和错误分类。
+- `DeliveryAttempt`：归档保存提供方、脱敏接收配置标识、榜期、尝试次数、最终状态和错误分类。服务方消息标识和原始错误文本不写入归档。
 
 内容摘要值对排序稳定的规范化 JSON 计算 SHA-256。接收配置标识由提供方名称和密钥的不可逆摘要前缀构成，只用于区分配置，不保存 SendKey。
 
@@ -60,7 +60,7 @@ GitHub 没有官方 Trending API，也不提供严格的“昨日自然日榜”
 
 生成结果写入 `data/digests/YYYY-MM-DD.json`，发送尝试写入 `data/deliveries/YYYY-MM-DD.json`。GitHub Actions 成功或失败后仅提交发生变化且不含秘密的文件；预览模式默认不提交。JSON 使用稳定字段顺序，既可审阅也便于后续迁移。
 
-幂等键为 `provider + recipient_fingerprint + target_date + content_hash`。成功记录存在时普通 `run` 跳过；`resend` 创建带 `manual_resend` 原因的新 attempt，不篡改原记录。
+去重依据为 `provider + recipient_fingerprint + target_date`。成功记录存在时普通 `run` 跳过；`resend` 创建带 `manual_resend` 原因的新 attempt，不篡改原记录。
 
 备选的 Actions Cache/Artifact 不保证长期留存和跨运行可查询；外部数据库对单用户项目过重。
 

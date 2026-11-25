@@ -54,12 +54,16 @@ class DeliveryStore:
             stable_json([item.to_dict() for item in attempts]), encoding="utf-8"
         )
 
-    def successful(self, target_date: date, idempotency_key: str) -> DeliveryAttempt | None:
+    def successful(
+        self, target_date: date, provider: str, recipient_fingerprint: str
+    ) -> DeliveryAttempt | None:
         return next(
             (
                 item
                 for item in self.load(target_date)
-                if item.idempotency_key == idempotency_key and item.status == "success"
+                if item.provider == provider
+                and item.recipient_fingerprint == recipient_fingerprint
+                and item.status == "success"
             ),
             None,
         )

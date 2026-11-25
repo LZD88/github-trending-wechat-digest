@@ -131,7 +131,9 @@ class ServerChanProvider:
                 data={"title": title, "desp": body},
             )
         except (httpx.TimeoutException, httpx.NetworkError) as exc:
-            raise DeliveryError(str(exc), retryable=True, category="network") from exc
+            raise DeliveryError(
+                "ServerChan connection failed or timed out", retryable=True, category="network"
+            ) from exc
 
         if response.status_code == 429 or response.status_code >= 500:
             raise DeliveryError(
@@ -157,14 +159,20 @@ class ServerChanProvider:
             raise DeliveryError(
                 "ServerChan returned invalid JSON", retryable=True, category="temporary"
             ) from exc
-        code = payload.get("code", 0)
+        code = payload.get("code") if isinstance(payload, dict) else None
+        if type(code) is not int:
+            raise DeliveryError(
+                "ServerChan response did not include a valid status code",
+                retryable=True,
+                category="temporary",
+            )
         if code != 0:
             category = "authentication" if code in {40001, 40002} else "request"
             raise DeliveryError(
                 f"ServerChan API error code {code}", retryable=False, category=category
             )
-        data = payload.get("data") or {}
-        message_id = data.get("pushid") or data.get("readkey") or payload.get("message")
+        data = payload.get("data")
+        message_id = data.get("pushid") if isinstance(data, dict) else None
         return str(message_id or "accepted")
 
 
@@ -179,6 +187,14 @@ class DeliveryService:
         self.provider = provider
         self.store = store
         self.now = now
+
+    def already_delivered(self, snapshot: DigestSnapshot) -> bool:
+        return (
+            self.store.successful(
+                snapshot.target_date, self.provider.name, self.provider.recipient_fingerprint
+            )
+            is not None
+        )
 
     def deliver(
         self,
@@ -197,7 +213,9 @@ class DeliveryService:
             attempted_at=self.now(),
             reason=reason,
         )
-        prior = self.store.successful(snapshot.target_date, probe.idempotency_key)
+        prior = self.store.successful(
+            snapshot.target_date, probe.provider, probe.recipient_fingerprint
+        )
         if prior and not force:
             skipped = DeliveryAttempt(
                 provider=probe.provider,

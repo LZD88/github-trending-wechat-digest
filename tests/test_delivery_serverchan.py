@@ -44,3 +44,23 @@ def test_serverchan_sends_all_segments_in_order() -> None:
 
     assert result.message_ids == ["one", "two"]
     assert len(route.calls) == 2
+
+
+@respx.mock
+def test_serverchan_does_not_use_read_key_as_a_message_id() -> None:
+    respx.post("https://sctapi.ftqq.com/SCT_TEST.send").respond(
+        200, json={"code": 0, "data": {"readkey": "private-reader-key"}}
+    )
+
+    result = ServerChanProvider(httpx.Client(), "SCT_TEST").send("title", ["text"])
+
+    assert result.success
+    assert result.message_ids == ["accepted"]
+
+
+@respx.mock
+def test_serverchan_requires_explicit_success_code() -> None:
+    respx.post("https://sctapi.ftqq.com/SCT_TEST.send").respond(200, json={})
+
+    provider = ServerChanProvider(httpx.Client(), "SCT_TEST", max_attempts=1)
+    assert not provider.send("title", ["text"]).success

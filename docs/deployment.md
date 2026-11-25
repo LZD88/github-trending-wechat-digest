@@ -79,9 +79,9 @@ github-trending-wechat run
 
 - 个人微信收到 GitHub 热榜消息；
 - `data/digests/YYYY-MM-DD.json` 保存不含秘密的榜单快照；
-- `data/deliveries/YYYY-MM-DD.json` 保存发送状态和服务方消息标识。
+- `data/deliveries/YYYY-MM-DD.json` 保存榜期、执行结果和去重所需的接收配置指纹。服务方消息标识与原始错误文本不写入归档。
 
-再次执行相同榜期与相同内容时会显示 `idempotent_skip`，不会重复推送。
+同一榜期已向同一个接收配置成功发送后，普通运行会显示 `idempotent_skip`。需要再发送时使用 `resend`。
 
 ## 6. 每日自动执行
 

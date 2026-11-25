@@ -11,7 +11,7 @@
 - `SUMMARY_API_BASE`、`SUMMARY_MODEL` 可以配置为 Actions Variable，因为它们本身不是凭据。
 - `.env` 已被 Git 忽略，`.env.example` 只包含占位符。
 - 日志会遮盖 SendKey、Authorization、API Key 和 Token 形式的值。
-- `data/` 仅保存公开榜单信息、不可逆接收配置指纹和脱敏错误，不保存完整密钥。
+- `data/` 保存公开榜单及必要的发送状态，接收配置使用不可逆指纹区分。归档不写入服务方消息标识、原始错误文本或完整密钥。
 
 ## 仓库可见性
 

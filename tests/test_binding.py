@@ -32,6 +32,7 @@ def test_binding_success_records_message_id_and_context(tmp_path: Path) -> None:
     assert "production" in provider.requests[0][1][0]
     assert NOW.isoformat() in provider.requests[0][1][0]
     assert store.load(NOW.date())[0].status == "binding_verified"
+    assert "binding-message" not in store.path_for(NOW.date()).read_text(encoding="utf-8")
 
 
 def test_binding_failure_is_not_marked_verified(tmp_path: Path) -> None:
