@@ -1,0 +1,19 @@
+[
+  {
+    "attempt_count": 1,
+    "attempted_at": "2026-11-25T19:23:57.029519+08:00",
+    "content_hash": "7145056680f6ef1162feec9736bf2c60281275b2ee081053713939de741c46ef",
+    "error_class": null,
+    "error_message": null,
+    "idempotency_key": "fcaef06c050949742406308dfc63fd5824bc2bd508a84626e54960c4ed1d1c08",
+    "message_ids": [
+      "70830359"
+    ],
+    "provider": "serverchan",
+    "reason": "binding_test",
+    "recipient_fingerprint": "f7da30892c617b5d",
+    "related_attempt_key": null,
+    "status": "binding_verified",
+    "target_date": "2026-11-25"
+  }
+]
