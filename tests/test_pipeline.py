@@ -1,13 +1,16 @@
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+import pytest
+
 from github_trending_wechat.delivery import DeliveryResult, DeliveryService
 from github_trending_wechat.models import TrendingEntry
 from github_trending_wechat.pipeline import DigestApplication
-from github_trending_wechat.sources import SourceResult
+from github_trending_wechat.sources import SourceError, SourceResult
 from github_trending_wechat.storage import DeliveryStore, DigestStore
 
-NOW = datetime(2026, 11, 25, 8, 0, tzinfo=UTC)
+NOW = datetime(2026, 11, 25, 0, 0, tzinfo=UTC)
+CAPTURED = datetime(2026, 11, 24, 15, 55, tzinfo=UTC)
 
 
 class OrderedSources:
@@ -63,12 +66,17 @@ def test_pipeline_orders_stages_and_persists_results(tmp_path: Path) -> None:
         delivery_service=DeliveryService(
             OrderedProvider(events), DeliveryStore(tmp_path), now=lambda: NOW
         ),
-        now=lambda: NOW,
+        now=lambda: CAPTURED,
     )
 
-    outcome = application.run(date(2026, 11, 24))
+    archived = application.capture(scheduled=True)
+    assert events == ["fetch", "summarize"]
+    application.now = lambda: NOW
+    outcome = application.run()
 
     assert events == ["fetch", "summarize", "deliver"]
+    assert outcome.snapshot == archived
+    assert outcome.snapshot.fetched_at == CAPTURED
     assert outcome.attempt is not None and outcome.attempt.status == "success"
     assert outcome.snapshot.warnings == ["source warning", "summary warning"]
     assert DigestStore(tmp_path).load(date(2026, 11, 24)) is not None
@@ -85,11 +93,11 @@ def test_pipeline_preview_does_not_require_delivery(tmp_path: Path) -> None:
         now=lambda: NOW,
     )
 
-    outcome = application.preview(date(2026, 11, 24))
+    outcome = application.preview()
 
     assert events == ["fetch", "summarize"]
     assert outcome.attempt is None
-    assert DigestStore(tmp_path).load(date(2026, 11, 24)) is None
+    assert DigestStore(tmp_path).load(date(2026, 11, 25)) is None
 
 
 def test_resend_prefers_historical_snapshot_without_refetch(tmp_path: Path) -> None:
@@ -100,9 +108,9 @@ def test_resend_prefers_historical_snapshot_without_refetch(tmp_path: Path) -> N
         summarizer=OrderedSummarizer(events),
         digest_store=digest_store,
         delivery_service=None,
-        now=lambda: NOW,
+        now=lambda: datetime(2026, 11, 20, 15, 55, tzinfo=UTC),
     )
-    seed.generate(date(2026, 11, 20), save=True)
+    seed.capture(scheduled=True)
     events.clear()
     application = DigestApplication(
         sources=OrderedSources(events),
@@ -114,6 +122,7 @@ def test_resend_prefers_historical_snapshot_without_refetch(tmp_path: Path) -> N
         now=lambda: NOW,
     )
 
+    assert application.preview(date(2026, 11, 20)).snapshot.target_date == date(2026, 11, 20)
     outcome = application.resend(date(2026, 11, 20))
 
     assert events == ["deliver"]
@@ -121,7 +130,8 @@ def test_resend_prefers_historical_snapshot_without_refetch(tmp_path: Path) -> N
     assert outcome.attempt is not None and outcome.attempt.reason == "manual_resend"
 
 
-def test_resend_rebuilds_missing_snapshot_before_delivery(tmp_path: Path) -> None:
+@pytest.mark.parametrize("operation", ["run", "resend", "preview"])
+def test_missing_snapshot_does_not_fetch_or_send(tmp_path: Path, operation: str) -> None:
     events: list[str] = []
     application = DigestApplication(
         sources=OrderedSources(events),
@@ -133,8 +143,7 @@ def test_resend_rebuilds_missing_snapshot_before_delivery(tmp_path: Path) -> Non
         now=lambda: NOW,
     )
 
-    outcome = application.resend(date(2026, 11, 20))
-
-    assert events == ["fetch", "summarize", "deliver"]
-    assert outcome.snapshot_changed is True
-    assert DigestStore(tmp_path).load(date(2026, 11, 20)) is not None
+    with pytest.raises(SourceError, match="2026-11-20.*缺少"):
+        getattr(application, operation)(date(2026, 11, 20))
+    assert events == []
+    assert DigestStore(tmp_path).load(date(2026, 11, 20)) is None

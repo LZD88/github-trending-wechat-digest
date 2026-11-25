@@ -18,11 +18,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    run_parser = subparsers.add_parser("run", help="Generate and send today's digest")
+    capture_parser = subparsers.add_parser("capture", help="Archive the current Trending snapshot")
+    capture_parser.add_argument("--scheduled", action="store_true", help="Use the nightly window")
+
+    run_parser = subparsers.add_parser("run", help="Send an archived digest")
     run_parser.add_argument("--date", help="Target date (YYYY-MM-DD); defaults to yesterday")
 
     preview_parser = subparsers.add_parser("preview", help="Generate without sending")
-    preview_parser.add_argument("--date", help="Target date (YYYY-MM-DD); defaults to yesterday")
+    preview_parser.add_argument(
+        "--date", help="Archived date (YYYY-MM-DD); defaults to live preview"
+    )
     preview_parser.add_argument(
         "--save", action="store_true", help="Persist the generated snapshot"
     )
@@ -55,6 +60,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         application = build_application(settings, require_delivery=require_delivery)
         target = parse_target_date(args.date) if getattr(args, "date", None) else None
 
+        if args.command == "capture":
+            snapshot = application.capture(scheduled=args.scheduled)
+            print(
+                f"capture=success target_date={snapshot.target_date} "
+                f"fetched_at={snapshot.fetched_at.isoformat()} source={snapshot.source} "
+                f"entries={len(snapshot.entries)}"
+            )
+            return 0
         if args.command == "preview":
             outcome = application.preview(target, save=args.save)
             print("\n\n".join(outcome.rendered.segments))

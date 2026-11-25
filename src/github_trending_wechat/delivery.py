@@ -188,14 +188,6 @@ class DeliveryService:
         self.store = store
         self.now = now
 
-    def already_delivered(self, snapshot: DigestSnapshot) -> bool:
-        return (
-            self.store.successful(
-                snapshot.target_date, self.provider.name, self.provider.recipient_fingerprint
-            )
-            is not None
-        )
-
     def deliver(
         self,
         snapshot: DigestSnapshot,

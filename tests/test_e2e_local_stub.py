@@ -111,6 +111,9 @@ def test_end_to_end_local_http_stub_and_idempotent_second_run(tmp_path: Path) ->
             now=lambda: NOW,
         )
 
+        application.now = lambda: datetime(2026, 11, 24, 15, 55, tzinfo=UTC)
+        application.capture(scheduled=True)
+        application.now = lambda: NOW
         first = application.run(date(2026, 11, 24))
         second = application.run(date(2026, 11, 24))
     finally:

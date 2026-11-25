@@ -4,6 +4,8 @@ on:
   schedule:
     # 00:00 UTC = 08:00 Asia/Shanghai
     - cron: "0 0 * * *"
+    # 15:55 UTC = 23:55 Asia/Shanghai
+    - cron: "55 15 * * *"
   workflow_dispatch:
     inputs:
       mode:
@@ -13,6 +15,7 @@ on:
         type: choice
         options:
           - preview
+          - capture
           - run
           - resend
           - test-binding
@@ -42,6 +45,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -62,7 +67,8 @@ jobs:
         id: operation
         shell: bash
         env:
-          MODE: ${{ github.event_name == 'schedule' && 'run' || inputs.mode }}
+          MODE: ${{ github.event_name == 'schedule' && (github.event.schedule == '55 15 * * *' && 'capture' || 'run') || inputs.mode }}
+          EVENT_NAME: ${{ github.event_name }}
           TARGET_DATE: ${{ inputs.target_date }}
           ENVIRONMENT_LABEL: ${{ inputs.environment_label || 'github-actions' }}
           SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
@@ -79,6 +85,13 @@ jobs:
                 github-trending-wechat preview --date "$TARGET_DATE"
               else
                 github-trending-wechat preview
+              fi
+              ;;
+            capture)
+              if [[ "$EVENT_NAME" == schedule ]]; then
+                github-trending-wechat capture --scheduled
+              else
+                github-trending-wechat capture
               fi
               ;;
             run)
@@ -109,7 +122,7 @@ jobs:
           exit 0
 
       - name: Commit non-sensitive run records
-        if: ${{ steps.operation.outputs.exit_status != '' && github.event_name == 'schedule' || inputs.mode != 'preview' }}
+        if: ${{ steps.operation.outputs.exit_status != '' && (github.event_name == 'schedule' || inputs.mode != 'preview') }}
         shell: bash
         run: |
           if [[ ! -d data ]]; then
@@ -118,7 +131,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- data
-          git diff --cached --quiet || git commit -m "data: update GitHub trending digest records [skip ci]"
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "data: update GitHub trending digest records [skip ci]"
           git push
 
       - name: Propagate operation failure

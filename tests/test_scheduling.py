@@ -3,7 +3,21 @@ from datetime import UTC, date, datetime
 import pytest
 
 from github_trending_wechat.models import DigestSnapshot, TrendingEntry
-from github_trending_wechat.scheduling import parse_target_date, target_date_for_run
+from github_trending_wechat.scheduling import capture_date, parse_target_date, target_date_for_run
+
+
+def test_scheduled_capture_keeps_previous_date_when_delayed_past_midnight() -> None:
+    now = datetime.fromisoformat("2026-11-25T00:15:00+08:00")
+
+    assert capture_date(now, scheduled=True) == date(2026, 11, 24)
+    assert capture_date(now) == date(2026, 11, 25)
+
+
+def test_scheduled_capture_rejects_later_data() -> None:
+    now = datetime.fromisoformat("2026-11-25T00:55:00+08:00")
+
+    with pytest.raises(ValueError, match="outside"):
+        capture_date(now, scheduled=True)
 
 
 def test_target_date_uses_shanghai_calendar_boundary() -> None:
