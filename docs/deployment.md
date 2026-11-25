@@ -37,16 +37,16 @@ python -m pip install -e ".[dev]"
 github-trending-wechat preview
 ```
 
-指定榜期仅改变日报标签；数据仍是执行时获取的 GitHub 滚动 `daily` 榜：
+不指定日期时，预览实时滚动榜。指定日期时，预览该日期的已归档快照：
 
 ```bash
 github-trending-wechat preview --date 2026-11-24
 ```
 
-预览默认不写入 `data/`。需要保存调试快照时可显式执行：
+预览默认不写入 `data/`。需要采集并保存当日快照时，可以运行：
 
 ```bash
-github-trending-wechat preview --save
+github-trending-wechat capture
 ```
 
 ## 4. 验证微信绑定
@@ -67,7 +67,7 @@ github-trending-wechat test-binding --environment local
 
 ## 5. 首次正式发送
 
-在同一工作流中将 `mode` 选择为 `run`。可留空 `target_date`，系统会按北京时间使用前一日作为榜期；也可以输入 `YYYY-MM-DD` 明确指定标签日期。
+在同一工作流中将 `mode` 选择为 `run`。留空 `target_date` 会发送北京时间前一日的归档快照。想立即验证新部署，可先运行 `capture`，然后用 `run` 并填入北京时间当天日期。
 
 本地正式发送命令：
 
@@ -85,7 +85,7 @@ github-trending-wechat run
 
 ## 6. 每日自动执行
 
-在仓库的 Actions Variables 里创建 `DAILY_DIGEST_ENABLED`，值设为 `true`。工作流计划在北京时间每天 08:00 运行，实际触发可能稍有延迟，消息会显示抓取时间。
+将仓库的 Actions Variable `DAILY_DIGEST_ENABLED` 设为 `true` 后，工作流计划在北京时间每天 23:55 采集，次日 08:00 推送。若晚间任务延迟到次日 00:55 之前，仍归入原榜期，消息会显示实际抓取时间。采集超过窗口或缺少对应榜期的快照时，工作流会标记失败并给出原因。
 
 ## 7. 补发
 
@@ -101,7 +101,7 @@ GitHub Actions 手动运行时：
 github-trending-wechat resend --date 2026-11-24
 ```
 
-系统优先复用该日期的历史快照；快照不存在时才重新获取并校验当前日榜。补发会留下新记录并关联原发送。
+补发使用指定日期的历史快照，并保存新的发送记录。找不到该日快照时会报错。
 
 ## 8. 停用与回滚
 

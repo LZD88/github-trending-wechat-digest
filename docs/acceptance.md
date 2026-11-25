@@ -6,8 +6,8 @@
 
 | Scenario | 自动化证据 |
 |---|---|
-| 正常定时生成 | `test_workflow_schedules_shanghai_0800_and_supports_manual_modes`、`test_delayed_morning_run_still_targets_yesterday` |
-| 定时任务延迟执行 | `test_delayed_morning_run_still_targets_yesterday` |
+| 正常定时生成 | `test_workflow_schedules_shanghai_0800_and_supports_manual_modes`、`test_pipeline_orders_stages_and_persists_results` |
+| 定时任务延迟执行 | `test_scheduled_capture_keeps_previous_date_when_delayed_past_midnight`、`test_scheduled_capture_rejects_later_data` |
 | 数据源返回至少十个有效仓库 | `test_orchestrator_prefers_primary_and_keeps_first_ten`、`test_end_to_end_local_http_stub_and_idempotent_second_run` |
 | 有效仓库不足十个 | `test_orchestrator_warns_when_fewer_than_ten_are_available` |
 | 项目元数据完整 | `test_enricher_uses_token_and_updates_metadata` |
@@ -22,7 +22,7 @@
 | 首次生成榜单 | `test_digest_store_round_trip_uses_date_path` |
 | 相同榜期重复生成相同内容 | `test_digest_store_reuses_identical_snapshot` |
 | 手动预览 | `test_preview_outputs_content_and_never_calls_delivery`、`test_pipeline_preview_does_not_require_delivery` |
-| 指定榜期补发 | `test_resend_prefers_historical_snapshot_without_refetch`、`test_resend_rebuilds_missing_snapshot_before_delivery` |
+| 指定榜期补发 | `test_resend_prefers_historical_snapshot_without_refetch`、`test_missing_snapshot_does_not_fetch_or_send` |
 
 ## personal-wechat-delivery
 
