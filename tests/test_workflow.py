@@ -14,13 +14,19 @@ def test_workflow_schedules_shanghai_0800_and_supports_manual_modes() -> None:
     workflow = load_workflow()
     triggers = workflow["on"]
 
-    assert [schedule["cron"] for schedule in triggers["schedule"]] == ["0 0 * * *", "55 15 * * *"]
+    assert [schedule["cron"] for schedule in triggers["schedule"]] == [
+        "0 0 * * *",
+        "17 0 * * *",
+        "55 15 * * *",
+        "17 16 * * *",
+    ]
     options = triggers["workflow_dispatch"]["inputs"]["mode"]["options"]
     assert options == ["preview", "capture", "run", "resend", "test-binding"]
     steps = workflow["jobs"]["digest"]["steps"]
     operation = next(step for step in steps if step.get("id") == "operation")
     assert (
-        "github.event.schedule == '55 15 * * *' && 'capture' || 'run'" in operation["env"]["MODE"]
+        "(github.event.schedule == '55 15 * * *' || github.event.schedule == '17 16 * * *')"
+        " && 'capture' || 'run'" in operation["env"]["MODE"]
     )
     assert "github-trending-wechat capture --scheduled" in operation["run"]
     assert "target_date" in triggers["workflow_dispatch"]["inputs"]

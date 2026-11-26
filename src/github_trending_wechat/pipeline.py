@@ -67,7 +67,12 @@ class DigestApplication:
 
     def capture(self, *, scheduled: bool = False) -> DigestSnapshot:
         now = self.now()
-        snapshot, _ = self._capture(now, capture_date(now, scheduled=scheduled), save=True)
+        target_date = capture_date(now, scheduled=scheduled)
+        if scheduled:
+            archived = self.digest_store.load(target_date)
+            if archived is not None:
+                return archived
+        snapshot, _ = self._capture(now, target_date, save=True)
         return snapshot
 
     def archived_snapshot(self, target_date: date) -> DigestSnapshot:

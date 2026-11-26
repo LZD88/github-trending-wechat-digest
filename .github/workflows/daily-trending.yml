@@ -4,8 +4,12 @@ on:
   schedule:
     # 00:00 UTC = 08:00 Asia/Shanghai
     - cron: "0 0 * * *"
+    # 00:17 UTC = 08:17 Asia/Shanghai, backup delivery
+    - cron: "17 0 * * *"
     # 15:55 UTC = 23:55 Asia/Shanghai
     - cron: "55 15 * * *"
+    # 16:17 UTC = 00:17 Asia/Shanghai next day, backup capture
+    - cron: "17 16 * * *"
   workflow_dispatch:
     inputs:
       mode:
@@ -67,7 +71,7 @@ jobs:
         id: operation
         shell: bash
         env:
-          MODE: ${{ github.event_name == 'schedule' && (github.event.schedule == '55 15 * * *' && 'capture' || 'run') || inputs.mode }}
+          MODE: ${{ github.event_name == 'schedule' && ((github.event.schedule == '55 15 * * *' || github.event.schedule == '17 16 * * *') && 'capture' || 'run') || inputs.mode }}
           EVENT_NAME: ${{ github.event_name }}
           TARGET_DATE: ${{ inputs.target_date }}
           ENVIRONMENT_LABEL: ${{ inputs.environment_label || 'github-actions' }}

@@ -71,8 +71,13 @@ def test_pipeline_orders_stages_and_persists_results(tmp_path: Path) -> None:
 
     archived = application.capture(scheduled=True)
     assert events == ["fetch", "summarize"]
+    application.now = lambda: datetime.fromisoformat("2026-11-25T00:17:00+08:00")
+    assert application.capture(scheduled=True) == archived
     application.now = lambda: NOW
     outcome = application.run()
+    application.now = lambda: datetime.fromisoformat("2026-11-25T08:17:00+08:00")
+    backup = application.run()
+    assert backup.attempt is not None and backup.attempt.status == "idempotent_skip"
 
     assert events == ["fetch", "summarize", "deliver"]
     assert outcome.snapshot == archived
