@@ -9,5 +9,16 @@
     "related_attempt_key": null,
     "status": "binding_verified",
     "target_date": "2026-11-25"
+  },
+  {
+    "attempt_count": 1,
+    "attempted_at": "2026-11-26T14:08:02.994579+08:00",
+    "error_class": null,
+    "provider": "serverchan",
+    "reason": "scheduled",
+    "recipient_fingerprint": "f7da30892c617b5d",
+    "related_attempt_key": null,
+    "status": "success",
+    "target_date": "2026-11-25"
   }
 ]
