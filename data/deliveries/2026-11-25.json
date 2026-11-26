@@ -20,5 +20,16 @@
     "related_attempt_key": null,
     "status": "success",
     "target_date": "2026-11-25"
+  },
+  {
+    "attempt_count": 0,
+    "attempted_at": "2026-11-26T15:59:48.173460+08:00",
+    "error_class": null,
+    "provider": "serverchan",
+    "reason": "scheduled",
+    "recipient_fingerprint": "f7da30892c617b5d",
+    "related_attempt_key": "d69b666203d60356eb0c936c3c6a145c3b442719a1b9299391a7a1d08cb8ed0a",
+    "status": "idempotent_skip",
+    "target_date": "2026-11-25"
   }
 ]
