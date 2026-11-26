@@ -1,8 +1,9 @@
+import json
 from datetime import UTC, date, datetime
 from pathlib import Path
 
-from github_trending_wechat.models import DigestSnapshot, TrendingEntry
-from github_trending_wechat.storage import DigestStore
+from github_trending_wechat.models import DeliveryAttempt, DigestSnapshot, TrendingEntry
+from github_trending_wechat.storage import DeliveryStore, DigestStore
 
 
 def snapshot(description: str = "示例") -> DigestSnapshot:
@@ -65,3 +66,22 @@ def test_digest_snapshot_file_contains_no_secret_fields(tmp_path: Path) -> None:
     assert "sendkey" not in text
     assert "api_key" not in text
     assert "authorization" not in text
+
+
+def test_delivery_store_accepts_legacy_single_record_and_appends(tmp_path: Path) -> None:
+    store = DeliveryStore(tmp_path)
+    target_date = date(2026, 11, 25)
+    attempted_at = datetime(2026, 11, 25, tzinfo=UTC)
+    legacy = DeliveryAttempt(
+        "serverchan", "recipient", target_date, "", "binding_verified", attempted_at
+    )
+    path = store.path_for(target_date)
+    path.parent.mkdir()
+    path.write_text(json.dumps(legacy.to_dict()), encoding="utf-8")
+
+    assert store.successful(target_date, "serverchan", "recipient") is None
+    delivered = DeliveryAttempt("serverchan", "recipient", target_date, "", "success", attempted_at)
+    store.append(delivered)
+
+    assert store.load(target_date) == [legacy, delivered]
+    assert store.successful(target_date, "serverchan", "recipient") == delivered

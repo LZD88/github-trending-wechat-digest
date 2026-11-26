@@ -44,6 +44,8 @@ class DeliveryStore:
         if not path.exists():
             return []
         data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            data = [data]
         return [DeliveryAttempt.from_dict(item) for item in data]
 
     def append(self, attempt: DeliveryAttempt) -> None:
