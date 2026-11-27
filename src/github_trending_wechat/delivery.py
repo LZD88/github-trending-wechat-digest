@@ -195,6 +195,7 @@ class DeliveryService:
         *,
         force: bool = False,
         reason: str = "scheduled",
+        record_skip: bool = True,
     ) -> DeliveryAttempt:
         probe = DeliveryAttempt(
             provider=self.provider.name,
@@ -219,7 +220,8 @@ class DeliveryService:
                 reason=reason,
                 related_attempt_key=prior.idempotency_key,
             )
-            self.store.append(skipped)
+            if record_skip:
+                self.store.append(skipped)
             return skipped
 
         result = self.provider.send(rendered.title, rendered.segments)

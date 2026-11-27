@@ -14,9 +14,11 @@ from github_trending_wechat.scheduling import capture_date, shanghai_now, target
 from github_trending_wechat.sources import (
     GitHubRepositoryEnricher,
     GitHubTrendingSource,
+    HistoricalTrendingSource,
     JsonFallbackSource,
     SourceError,
     SourceOrchestrator,
+    SourceResult,
 )
 from github_trending_wechat.storage import DeliveryStore, DigestStore
 from github_trending_wechat.summarizer import ChineseSummarizer
@@ -39,17 +41,16 @@ class DigestApplication:
         digest_store: DigestStore,
         delivery_service: DeliveryService | None,
         now: Callable[[], datetime] = shanghai_now,
+        historical_source: HistoricalTrendingSource | None = None,
     ) -> None:
         self.sources = sources
         self.summarizer = summarizer
         self.digest_store = digest_store
         self.delivery_service = delivery_service
         self.now = now
+        self.historical_source = historical_source
 
-    def _capture(
-        self, current: datetime, target_date: date, *, save: bool
-    ) -> tuple[DigestSnapshot, bool]:
-        source_result = self.sources.fetch_top(current)
+    def _build_snapshot(self, target_date: date, source_result: SourceResult) -> DigestSnapshot:
         warnings = list(source_result.warnings or [])
         warnings.extend(self.summarizer.apply(source_result.entries))
         snapshot = DigestSnapshot(
@@ -61,6 +62,12 @@ class DigestApplication:
             warnings=warnings,
         )
         snapshot.ensure_content_hash()
+        return snapshot
+
+    def _capture(
+        self, current: datetime, target_date: date, *, save: bool
+    ) -> tuple[DigestSnapshot, bool]:
+        snapshot = self._build_snapshot(target_date, self.sources.fetch_top(current))
         if save:
             return self.digest_store.save(snapshot)
         return snapshot, False
@@ -91,12 +98,19 @@ class DigestApplication:
         snapshot, changed = self._capture(now, capture_date(now), save=save)
         return RunOutcome(snapshot, render_digest(snapshot), snapshot_changed=changed)
 
-    def run(self, explicit_date: date | None = None) -> RunOutcome:
+    def run(
+        self, explicit_date: date | None = None, *, recover_missing: bool = False
+    ) -> RunOutcome:
         service = self._require_delivery_service()
         target_date = target_date_for_run(self.now(), explicit_date)
-        snapshot = self.archived_snapshot(target_date)
+        snapshot = self.digest_store.load(target_date)
+        if snapshot is None:
+            if not recover_missing or self.historical_source is None:
+                raise SourceError(f"榜期 {target_date} 缺少已归档的热榜快照")
+            snapshot = self._build_snapshot(target_date, self.historical_source.fetch(target_date))
+            snapshot, _ = self.digest_store.save(snapshot)
         rendered = render_digest(snapshot)
-        attempt = service.deliver(snapshot, rendered)
+        attempt = service.deliver(snapshot, rendered, record_skip=not recover_missing)
         return RunOutcome(snapshot, rendered, attempt)
 
     def resend(self, target_date: date) -> RunOutcome:
@@ -122,10 +136,11 @@ def build_application(
     now: Callable[[], datetime] = shanghai_now,
 ) -> DigestApplication:
     client = httpx.Client(timeout=settings.http_timeout_seconds, follow_redirects=True)
+    enricher = GitHubRepositoryEnricher(client, settings.github_token)
     sources = SourceOrchestrator(
         GitHubTrendingSource(client),
         JsonFallbackSource(client, timedelta(hours=settings.fallback_max_age_hours)),
-        GitHubRepositoryEnricher(client, settings.github_token),
+        enricher,
     )
     summarizer = ChineseSummarizer(
         client,
@@ -151,4 +166,5 @@ def build_application(
         digest_store=digest_store,
         delivery_service=delivery_service,
         now=now,
+        historical_source=HistoricalTrendingSource(client, enricher),
     )

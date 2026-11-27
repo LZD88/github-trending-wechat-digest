@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from typing import Any, Protocol
@@ -11,12 +11,14 @@ from typing import Any, Protocol
 import httpx
 
 from github_trending_wechat.models import TrendingEntry
+from github_trending_wechat.scheduling import SHANGHAI
 
 LOGGER = logging.getLogger(__name__)
 GITHUB_TRENDING_URL = "https://github.com/trending?since=daily"
 FALLBACK_TRENDING_URL = (
     "https://raw.githubusercontent.com/isboyjc/github-trending-api/main/data/daily/all.json"
 )
+HISTORICAL_ARCHIVE_REPO = "antonkomarev/github-trending-archive"
 ROLLING_BASIS = "GitHub daily Trending 滚动榜；抓取时刻快照，不代表北京时间自然日精确增量"
 
 
@@ -177,7 +179,9 @@ class GitHubRepositoryEnricher:
         self.token = token
         self.api_base = api_base.rstrip("/")
 
-    def enrich(self, entries: list[TrendingEntry]) -> list[TrendingEntry]:
+    def enrich(
+        self, entries: list[TrendingEntry], *, include_stars: bool = True
+    ) -> list[TrendingEntry]:
         headers = {
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
@@ -196,8 +200,70 @@ class GitHubRepositoryEnricher:
                 continue
             entry.original_description = data.get("description") or entry.original_description
             entry.language = data.get("language") or entry.language
-            entry.stars = data.get("stargazers_count", entry.stars)
+            if include_stars:
+                entry.stars = data.get("stargazers_count", entry.stars)
         return entries
+
+
+class HistoricalTrendingSource:
+    def __init__(self, client: httpx.Client, enricher: GitHubRepositoryEnricher) -> None:
+        self.client = client
+        self.enricher = enricher
+
+    def fetch(self, target: date) -> SourceResult:
+        path = f"archive/repository/{target.year}/{target.isoformat()}/(null).json"
+        headers = {"Authorization": f"Bearer {self.enricher.token}"} if self.enricher.token else {}
+        try:
+            response = self.client.get(
+                f"https://api.github.com/repos/{HISTORICAL_ARCHIVE_REPO}/commits",
+                params={"path": path, "per_page": 1},
+                headers=headers,
+            )
+            response.raise_for_status()
+            commits = response.json()
+            if not commits:
+                raise SourceError(f"榜期 {target} 暂无可用的历史归档")
+            revision = commits[0]
+            sha = revision["sha"]
+            if not re.fullmatch(r"[a-f0-9]{40}", sha):
+                raise ValueError("invalid archive commit SHA")
+            published = datetime.fromisoformat(revision["commit"]["committer"]["date"])
+            if published.tzinfo is None or published.astimezone(SHANGHAI).date() != target:
+                raise ValueError("archive publication date does not match the target in Beijing")
+            url = f"https://raw.githubusercontent.com/{HISTORICAL_ARCHIVE_REPO}/{sha}/{path}"
+            response = self.client.get(url)
+            response.raise_for_status()
+            archive = response.json()
+            names = archive["list"]
+            if archive["date"] != target.isoformat() or archive["language"] is not None:
+                raise ValueError("archive target date or language does not match")
+            if not isinstance(names, list):
+                raise ValueError("invalid archive repository list")
+        except (httpx.HTTPError, KeyError, ValueError, TypeError, IndexError) as exc:
+            raise SourceError(f"榜期 {target} 的历史归档读取失败：{exc}") from exc
+
+        valid = list(
+            dict.fromkeys(
+                name for name in names if isinstance(name, str) and _valid_repo_href(f"/{name}")
+            )
+        )[:10]
+        if not valid:
+            raise SourceError(f"榜期 {target} 的历史归档没有有效仓库")
+        entries = [
+            TrendingEntry(rank, name, f"https://github.com/{name}")
+            for rank, name in enumerate(valid, start=1)
+        ]
+        self.enricher.enrich(entries, include_stars=False)
+        warnings = [f"本项目的快照缺失，使用[同日历史归档]({url})。归档未保存当时的 Star 数。"]
+        if len(entries) < 10:
+            warnings.append(f"本次仅获取到 {len(entries)} 个有效仓库")
+        return SourceResult(
+            entries=entries,
+            source=HISTORICAL_ARCHIVE_REPO,
+            fetched_at=published,
+            basis="第三方保存的 GitHub Trending 滚动日榜，项目简介和语言使用当前信息",
+            warnings=warnings,
+        )
 
 
 class JsonFallbackSource:

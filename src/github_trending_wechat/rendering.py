@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from github_trending_wechat.models import DigestSnapshot, TrendingEntry
 from github_trending_wechat.scheduling import SHANGHAI
+from github_trending_wechat.sources import HISTORICAL_ARCHIVE_REPO
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,10 +22,11 @@ def render_digest(
     prefix = "【补发】" if resend else ""
     title = f"{prefix}GitHub 热榜 Top {len(snapshot.entries)} · {snapshot.target_date.isoformat()}"
     fetched = snapshot.fetched_at.astimezone(SHANGHAI).strftime("%Y-%m-%d %H:%M %Z")
+    time_label = "归档时间" if snapshot.source == HISTORICAL_ARCHIVE_REPO else "抓取时间"
     header_lines = [
         f"# {title}",
         "",
-        f"> 抓取时间：{fetched}",
+        f"> {time_label}：{fetched}",
         f"> 数据口径：{snapshot.basis}",
     ]
     if snapshot.warnings:

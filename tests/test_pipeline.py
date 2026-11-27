@@ -1,12 +1,18 @@
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+import httpx
 import pytest
 
 from github_trending_wechat.delivery import DeliveryResult, DeliveryService
 from github_trending_wechat.models import TrendingEntry
 from github_trending_wechat.pipeline import DigestApplication
-from github_trending_wechat.sources import SourceError, SourceResult
+from github_trending_wechat.sources import (
+    GitHubRepositoryEnricher,
+    HistoricalTrendingSource,
+    SourceError,
+    SourceResult,
+)
 from github_trending_wechat.storage import DeliveryStore, DigestStore
 
 NOW = datetime(2026, 11, 25, 0, 0, tzinfo=UTC)
@@ -133,6 +139,51 @@ def test_resend_prefers_historical_snapshot_without_refetch(tmp_path: Path) -> N
     assert events == ["deliver"]
     assert outcome.rendered.title.startswith("【补发】")
     assert outcome.attempt is not None and outcome.attempt.reason == "manual_resend"
+
+
+def test_recovery_archives_and_sends_historical_rankings_once(tmp_path: Path) -> None:
+    events: list[str] = []
+    target = date(2026, 11, 24)
+    published = "2026-11-24T12:50:10+00:00"
+    sha = "a" * 40
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/commits"):
+            assert request.url.params["path"].endswith("/(null).json")
+            return httpx.Response(
+                200, json=[{"sha": sha, "commit": {"committer": {"date": published}}}]
+            )
+        if request.url.host == "raw.githubusercontent.com":
+            assert f"/{sha}/" in request.url.path
+            return httpx.Response(
+                200, json={"date": str(target), "language": None, "list": ["owner/repo"]}
+            )
+        return httpx.Response(200, json={"description": "English", "stargazers_count": 123})
+
+    with httpx.Client(transport=httpx.MockTransport(respond)) as client:
+        application = DigestApplication(
+            sources=OrderedSources(events),
+            summarizer=OrderedSummarizer(events),
+            digest_store=DigestStore(tmp_path),
+            delivery_service=DeliveryService(
+                OrderedProvider(events), DeliveryStore(tmp_path), now=lambda: NOW
+            ),
+            now=lambda: NOW,
+            historical_source=HistoricalTrendingSource(client, GitHubRepositoryEnricher(client)),
+        )
+        first = application.run(recover_missing=True)
+        retry = application.run(recover_missing=True)
+        with pytest.raises(SourceError, match="publication date does not match"):
+            application.historical_source.fetch(date(2026, 11, 25))
+
+    assert first.snapshot.fetched_at.isoformat() == published
+    assert first.snapshot.entries[0].stars is None
+    assert "归档时间" in first.rendered.segments[0]
+    assert DigestStore(tmp_path).load(target) == first.snapshot
+    assert first.attempt is not None and first.attempt.status == "success"
+    assert retry.attempt is not None and retry.attempt.status == "idempotent_skip"
+    assert len(DeliveryStore(tmp_path).load(target)) == 1
+    assert events == ["summarize", "deliver"]
 
 
 @pytest.mark.parametrize("operation", ["run", "resend", "preview"])

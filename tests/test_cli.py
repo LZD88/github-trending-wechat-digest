@@ -44,8 +44,8 @@ class FakeApplication:
         result.attempt = None
         return result
 
-    def run(self, target: date | None) -> RunOutcome:
-        self.calls.append(("run", target))
+    def run(self, target: date | None, *, recover_missing: bool = False) -> RunOutcome:
+        self.calls.append(("run", target, recover_missing))
         if self.error:
             raise self.error
         return outcome(self.run_status)
@@ -86,7 +86,7 @@ def test_run_reports_success(
     code = cli.main(["run", "--date", "2026-11-24"])
 
     assert code == 0
-    assert fake_application.calls == [("run", date(2026, 11, 24))]
+    assert fake_application.calls == [("run", date(2026, 11, 24), False)]
     assert "delivery=success" in capsys.readouterr().out
 
 

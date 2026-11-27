@@ -24,6 +24,10 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser("run", help="Send an archived digest")
     run_parser.add_argument("--date", help="Target date (YYYY-MM-DD); defaults to yesterday")
 
+    run_parser.add_argument(
+        "--recover-missing", action="store_true", help="Use a dated historical archive if needed"
+    )
+
     preview_parser = subparsers.add_parser("preview", help="Generate without sending")
     preview_parser.add_argument(
         "--date", help="Archived date (YYYY-MM-DD); defaults to live preview"
@@ -73,7 +77,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("\n\n".join(outcome.rendered.segments))
             return 0
         if args.command == "run":
-            outcome = application.run(target)
+            outcome = application.run(target, recover_missing=args.recover_missing)
             assert outcome.attempt is not None
             print(
                 f"delivery={outcome.attempt.status} "
