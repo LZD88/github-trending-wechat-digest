@@ -5,7 +5,8 @@ from zoneinfo import ZoneInfo
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 NIGHTLY_CAPTURE_TIME = time(23, 55)
-NIGHTLY_CAPTURE_WINDOW = timedelta(hours=1)
+NIGHTLY_CAPTURE_WINDOW = timedelta(hours=3)
+MORNING_DELIVERY_TIME = time(8)
 
 
 def parse_target_date(value: str) -> date:
@@ -34,9 +35,26 @@ def capture_date(now: datetime, *, scheduled: bool = False) -> date:
     if not scheduled:
         return local.date()
 
+    target = _capture_target(local)
+    if target is None:
+        raise ValueError("Scheduled capture is outside the 23:55–02:55 Beijing window")
+    return target
+
+
+def _capture_target(local: datetime) -> date | None:
     planned = datetime.combine(local.date(), NIGHTLY_CAPTURE_TIME, SHANGHAI)
     if local < planned:
         planned -= timedelta(days=1)
-    if local - planned >= NIGHTLY_CAPTURE_WINDOW:
-        raise ValueError("Scheduled capture is outside the 23:55–00:55 Beijing window")
-    return planned.date()
+    return planned.date() if local - planned < NIGHTLY_CAPTURE_WINDOW else None
+
+
+def scheduled_operation(now: datetime) -> tuple[str, date | None]:
+    if now.tzinfo is None:
+        raise ValueError("now must be timezone-aware")
+    local = now.astimezone(SHANGHAI)
+    capture_target = _capture_target(local)
+    if capture_target is not None:
+        return "capture", capture_target
+    if local.time() >= MORNING_DELIVERY_TIME:
+        return "recover", local.date() - timedelta(days=1)
+    return "idle", None

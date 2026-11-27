@@ -14,5 +14,5 @@ def test_every_openspec_scenario_is_listed_in_acceptance_matrix() -> None:
 
     missing = [scenario for scenario in scenarios if f"| {scenario} |" not in matrix]
 
-    assert len(scenarios) == 32
+    assert len(scenarios) == 33
     assert missing == []

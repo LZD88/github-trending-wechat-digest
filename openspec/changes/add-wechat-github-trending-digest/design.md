@@ -26,7 +26,7 @@
 
 ### 1. 采用 Python 命令行应用与 GitHub Actions 调度
 
-Python CLI 提供 `capture`、`run`、`preview`、`test-binding` 和 `resend --date`。GitHub Actions 计划在北京时间 23:55 采集、次日 08:00 发送。采集延迟到次日 00:55 前仍归原榜期。发送和补发只读取指定日期的归档，缺失时以失败退出。
+Python CLI 提供 `capture`、`run`、`preview`、`test-binding` 和 `resend --date`。GitHub Actions 以北京时间设置 23:55、08:00 和每小时一次检查，按实际启动时间选择采集或发送。采集延迟到次日 02:55 前仍归原榜期。定时发送使用 `run --recover-missing`，在本地归档缺失时读取同日的第三方归档，标明来源和归档时间后发送。
 
 选择原因：Python 对 HTML 解析、HTTP、测试夹具和中文文本处理支持成熟；GitHub Actions 无需常驻服务器且 Secrets 管理与本项目场景匹配。定时任务可能延迟，因此业务日期从计划日期/显式输入计算，执行记录另存实际时间。
 

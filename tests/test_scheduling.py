@@ -3,7 +3,12 @@ from datetime import UTC, date, datetime
 import pytest
 
 from github_trending_wechat.models import DigestSnapshot, TrendingEntry
-from github_trending_wechat.scheduling import capture_date, parse_target_date, target_date_for_run
+from github_trending_wechat.scheduling import (
+    capture_date,
+    parse_target_date,
+    scheduled_operation,
+    target_date_for_run,
+)
 
 
 def test_scheduled_capture_keeps_previous_date_when_delayed_past_midnight() -> None:
@@ -14,10 +19,32 @@ def test_scheduled_capture_keeps_previous_date_when_delayed_past_midnight() -> N
 
 
 def test_scheduled_capture_rejects_later_data() -> None:
-    now = datetime.fromisoformat("2026-11-25T00:55:00+08:00")
+    now = datetime.fromisoformat("2026-11-25T02:55:00+08:00")
 
     with pytest.raises(ValueError, match="outside"):
         capture_date(now, scheduled=True)
+
+
+@pytest.mark.parametrize(
+    ("time", "mode", "day"),
+    [
+        ("23:55", "capture", 27),
+        ("02:17", "capture", 26),
+        ("02:55", "idle", None),
+        ("07:56", "idle", None),
+        ("08:00", "recover", 26),
+        ("08:13", "recover", 26),
+        ("08:37", "recover", 26),
+        ("15:59", "recover", 26),
+    ],
+)
+def test_scheduled_operation_uses_actual_beijing_time(
+    time: str, mode: str, day: int | None
+) -> None:
+    now = datetime.fromisoformat(f"2026-11-27T{time}:00+08:00").astimezone(UTC)
+    target = date(2026, 11, day) if day is not None else None
+
+    assert scheduled_operation(now) == (mode, target)
 
 
 def test_target_date_uses_shanghai_calendar_boundary() -> None:

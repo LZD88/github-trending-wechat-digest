@@ -15,19 +15,19 @@ def test_workflow_schedules_shanghai_0800_and_supports_manual_modes() -> None:
     triggers = workflow["on"]
 
     assert [schedule["cron"] for schedule in triggers["schedule"]] == [
-        "0 0 * * *",
-        "17 0 * * *",
-        "55 15 * * *",
-        "17 16 * * *",
+        "55 23 * * *",
+        "0 8 * * *",
+        "17 * * * *",
     ]
     options = triggers["workflow_dispatch"]["inputs"]["mode"]["options"]
-    assert options == ["preview", "capture", "run", "resend", "test-binding"]
+    assert all(schedule["timezone"] == "Asia/Shanghai" for schedule in triggers["schedule"])
+    assert options == ["preview", "capture", "run", "recover", "resend", "test-binding"]
     steps = workflow["jobs"]["digest"]["steps"]
     operation = next(step for step in steps if step.get("id") == "operation")
-    assert (
-        "(github.event.schedule == '55 15 * * *' || github.event.schedule == '17 16 * * *')"
-        " && 'capture' || 'run'" in operation["env"]["MODE"]
-    )
+    plan = next(step for step in steps if step.get("id") == "schedule")
+    assert "scheduled_operation(now)" in plan["run"]
+    assert "steps.schedule.outputs.mode || inputs.mode" in operation["env"]["MODE"]
+    assert "--recover-missing" in operation["run"]
     assert "github-trending-wechat capture --scheduled" in operation["run"]
     assert "target_date" in triggers["workflow_dispatch"]["inputs"]
 
