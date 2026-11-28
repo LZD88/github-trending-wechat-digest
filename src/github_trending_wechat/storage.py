@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+import logging
+from collections.abc import Iterator
+from datetime import date, timedelta
 from pathlib import Path
 
 from github_trending_wechat.models import DeliveryAttempt, DigestSnapshot, stable_json
+
+LOGGER = logging.getLogger(__name__)
 
 
 class DigestStore:
@@ -19,6 +23,18 @@ class DigestStore:
         if not path.exists():
             return None
         return DigestSnapshot.from_dict(json.loads(path.read_text(encoding="utf-8")))
+
+    def recent_snapshots(self, before: date) -> Iterator[DigestSnapshot]:
+        lookback = min(7, before.toordinal() - 1)
+        for offset in range(1, lookback + 1):
+            target = before - timedelta(days=offset)
+            try:
+                snapshot = self.load(target)
+            except (OSError, ValueError, KeyError, TypeError, AttributeError):
+                LOGGER.warning("Unable to read previous digest for %s", target)
+                continue
+            if snapshot is not None and snapshot.target_date == target:
+                yield snapshot
 
     def save(self, snapshot: DigestSnapshot) -> tuple[DigestSnapshot, bool]:
         snapshot.ensure_content_hash()

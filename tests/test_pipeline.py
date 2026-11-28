@@ -5,7 +5,7 @@ import httpx
 import pytest
 
 from github_trending_wechat.delivery import DeliveryResult, DeliveryService
-from github_trending_wechat.models import TrendingEntry
+from github_trending_wechat.models import DigestSnapshot, TrendingEntry
 from github_trending_wechat.pipeline import DigestApplication
 from github_trending_wechat.sources import (
     GitHubRepositoryEnricher,
@@ -14,6 +14,7 @@ from github_trending_wechat.sources import (
     SourceResult,
 )
 from github_trending_wechat.storage import DeliveryStore, DigestStore
+from github_trending_wechat.summarizer import ChineseSummarizer
 
 NOW = datetime(2026, 11, 25, 0, 0, tzinfo=UTC)
 CAPTURED = datetime(2026, 11, 24, 15, 55, tzinfo=UTC)
@@ -92,6 +93,44 @@ def test_pipeline_orders_stages_and_persists_results(tmp_path: Path) -> None:
     assert outcome.snapshot.warnings == ["source warning", "summary warning"]
     assert DigestStore(tmp_path).load(date(2026, 11, 24)) is not None
     assert DeliveryStore(tmp_path).load(date(2026, 11, 24))[0].status == "success"
+
+
+def test_capture_reuses_only_matching_valid_translations(tmp_path: Path) -> None:
+    events: list[str] = []
+    store = DigestStore(tmp_path)
+    old = TrendingEntry(
+        1, "owner/repo", "https://github.com/owner/repo", "English description", "有效译文"
+    )
+    placeholder = TrendingEntry(
+        1, old.full_name, old.url, old.original_description, "该项目简介暂无法转换为中文。"
+    )
+    for day, entry in [(22, old), (23, placeholder)]:
+        store.save(DigestSnapshot(date(2026, 11, day), CAPTURED, "primary", "daily", [entry]))
+
+    def unavailable(request: httpx.Request) -> httpx.Response:
+        events.append(request.url.host)
+        return httpx.Response(200, json={"error": "response missing choices"})
+
+    with httpx.Client(transport=httpx.MockTransport(unavailable)) as client:
+        application = DigestApplication(
+            sources=OrderedSources(events),
+            summarizer=ChineseSummarizer(
+                client, api_base="https://summary.test", api_key="example", public_fallback=True
+            ),
+            digest_store=store,
+            delivery_service=None,
+            now=lambda: CAPTURED,
+        )
+        snapshot = application.capture(scheduled=True)
+        assert snapshot.entries[0].chinese_description == "有效译文"
+        assert events == ["fetch"]
+
+        old.original_description = "Older description"
+        store.save(DigestSnapshot(date(2026, 11, 22), CAPTURED, "primary", "daily", [old]))
+        snapshot = application.capture()
+        assert snapshot.entries[0].chinese_description == "English description"
+        assert snapshot.warnings[-1] == "1 个项目的中文简介暂不可用，已保留英文原文"
+        assert events == ["fetch", "fetch", "summary.test", "api.mymemory.translated.net"]
 
 
 def test_pipeline_preview_does_not_require_delivery(tmp_path: Path) -> None:

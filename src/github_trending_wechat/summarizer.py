@@ -3,14 +3,17 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections.abc import Iterable
 from html import unescape
 
 import httpx
 
-from github_trending_wechat.models import TrendingEntry
+from github_trending_wechat.models import DigestSnapshot, TrendingEntry
 
 LOGGER = logging.getLogger(__name__)
 MYMEMORY_URL = "https://api.mymemory.translated.net/get"
+UNTRANSLATED_PREFIX = "该项目简介暂无法转换为中文"
+NO_DESCRIPTION = "暂无项目简介"
 
 
 class SummaryResponseError(ValueError):
@@ -23,6 +26,46 @@ class SummaryRefusedError(SummaryResponseError):
 
 def contains_chinese(text: str) -> bool:
     return bool(re.search(r"[\u3400-\u9fff]", text))
+
+
+def reuse_chinese_descriptions(
+    entries: list[TrendingEntry], history: Iterable[DigestSnapshot]
+) -> list[TrendingEntry]:
+    needed = {
+        (entry.full_name, entry.original_description)
+        for entry in entries
+        if entry.original_description.strip() and not contains_chinese(entry.original_description)
+    }
+    if not needed:
+        return entries
+
+    cached: dict[tuple[str, str], str] = {}
+    for snapshot in history:
+        for archived in snapshot.entries:
+            summary = archived.chinese_description
+            if (
+                not isinstance(archived.full_name, str)
+                or not isinstance(archived.original_description, str)
+                or not isinstance(summary, str)
+                or not contains_chinese(summary)
+                or summary.strip().startswith((UNTRANSLATED_PREFIX, NO_DESCRIPTION))
+            ):
+                continue
+            key = (archived.full_name, archived.original_description)
+            if key in needed:
+                cached[key] = summary
+                needed.remove(key)
+        if not needed:
+            break
+
+    remaining = []
+    for entry in entries:
+        summary = cached.get((entry.full_name, entry.original_description))
+        if summary is None:
+            remaining.append(entry)
+        else:
+            entry.chinese_description = summary
+    return remaining
 
 
 class ChineseSummarizer:
@@ -47,7 +90,7 @@ class ChineseSummarizer:
         for entry in entries:
             description = entry.original_description.strip()
             if not description:
-                entry.chinese_description = "暂无项目简介"
+                entry.chinese_description = NO_DESCRIPTION
             elif contains_chinese(description):
                 entry.chinese_description = description
             else:
@@ -57,7 +100,7 @@ class ChineseSummarizer:
             return warnings
         if not ((self.api_base and self.api_key) or self.public_fallback):
             for entry in pending:
-                entry.chinese_description = entry.original_description or "暂无项目简介"
+                entry.chinese_description = entry.original_description or NO_DESCRIPTION
             warnings.append("未配置中文摘要服务，英文简介已保留原文")
             return warnings
 
@@ -68,27 +111,22 @@ class ChineseSummarizer:
             except SummaryRefusedError:
                 LOGGER.warning("Chinese summary provider declined the request")
                 for entry in pending:
-                    entry.chinese_description = "该项目简介暂无法转换为中文。"
+                    entry.chinese_description = f"{UNTRANSLATED_PREFIX}。"
                 return ["部分项目的中文简介暂不可用"]
             except (SummaryResponseError, httpx.HTTPError) as exc:
                 LOGGER.warning("Chinese summary batch unavailable: %s", exc)
         if summaries is None:
-            summaries = (
-                self._translate_public_descriptions(pending)
-                if self.public_fallback
-                else [None] * len(pending)
-            )
+            summaries = [None] * len(pending)
+        untranslated = [index for index, summary in enumerate(summaries) if summary is None]
+        if self.public_fallback and untranslated:
+            alternatives = self._translate_public_descriptions([pending[i] for i in untranslated])
+            for index, alternative in zip(untranslated, alternatives, strict=True):
+                summaries[index] = alternative
         for entry, summary in zip(pending, summaries, strict=True):
-            if self.public_fallback and summary is None:
-                entry.chinese_description = "该项目简介暂无法转换为中文，可点开仓库查看原文。"
-                continue
             entry.chinese_description = summary or entry.original_description
-        if any(summary is None for summary in summaries):
-            warnings.append(
-                "部分项目的中文简介暂不可用"
-                if self.public_fallback
-                else "中文摘要服务不可用，部分简介已回退原文"
-            )
+        failed = summaries.count(None)
+        if failed:
+            warnings.append(f"{failed} 个项目的中文简介暂不可用，已保留英文原文")
         return warnings
 
     def _summarize_batch(self, entries: list[TrendingEntry]) -> list[str | None]:
@@ -153,12 +191,30 @@ class ChineseSummarizer:
                 )
                 response.raise_for_status()
                 payload = response.json()
-                if int(payload["responseStatus"]) != 200:
-                    raise ValueError("translation service reported a failure")
+                service_status = int(payload["responseStatus"])
+                if service_status != 200:
+                    LOGGER.warning(
+                        "Alternate translation declined %s (service status %d)",
+                        entry.full_name,
+                        service_status,
+                    )
+                    translated.append(None)
+                    continue
                 result = unescape(payload["responseData"]["translatedText"])
                 translated.append(result.strip() if contains_chinese(result) else None)
-            except (httpx.HTTPError, KeyError, TypeError, ValueError):
-                LOGGER.warning("Alternate translation unavailable for %s", entry.full_name)
+            except httpx.HTTPStatusError as exc:
+                LOGGER.warning(
+                    "Alternate translation unavailable for %s (HTTP %d)",
+                    entry.full_name,
+                    exc.response.status_code,
+                )
+                translated.append(None)
+            except (httpx.RequestError, AttributeError, KeyError, TypeError, ValueError) as exc:
+                LOGGER.warning(
+                    "Alternate translation unavailable for %s (%s)",
+                    entry.full_name,
+                    type(exc).__name__,
+                )
                 translated.append(None)
         return translated
 

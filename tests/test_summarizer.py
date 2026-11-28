@@ -1,6 +1,7 @@
 import json
 
 import httpx
+import pytest
 import respx
 
 from github_trending_wechat.models import TrendingEntry
@@ -143,11 +144,14 @@ def test_explicit_model_refusal_does_not_call_another_provider() -> None:
 
 
 @respx.mock
-def test_failed_public_translation_uses_chinese_placeholder() -> None:
+def test_failed_public_translation_keeps_original_and_records_cause(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     respx.get(MYMEMORY_URL).respond(429)
     item = entry("Example tool")
 
     warnings = ChineseSummarizer(httpx.Client(), public_fallback=True).apply([item])
 
-    assert "可点开仓库查看原文" in item.chinese_description
-    assert warnings
+    assert item.chinese_description == "Example tool"
+    assert warnings == ["1 个项目的中文简介暂不可用，已保留英文原文"]
+    assert "HTTP 429" in caplog.text

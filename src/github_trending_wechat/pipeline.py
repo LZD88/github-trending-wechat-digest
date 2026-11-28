@@ -21,7 +21,7 @@ from github_trending_wechat.sources import (
     SourceResult,
 )
 from github_trending_wechat.storage import DeliveryStore, DigestStore
-from github_trending_wechat.summarizer import ChineseSummarizer
+from github_trending_wechat.summarizer import ChineseSummarizer, reuse_chinese_descriptions
 
 
 @dataclass(slots=True)
@@ -52,7 +52,11 @@ class DigestApplication:
 
     def _build_snapshot(self, target_date: date, source_result: SourceResult) -> DigestSnapshot:
         warnings = list(source_result.warnings or [])
-        warnings.extend(self.summarizer.apply(source_result.entries))
+        remaining = reuse_chinese_descriptions(
+            source_result.entries, self.digest_store.recent_snapshots(target_date)
+        )
+        if remaining:
+            warnings.extend(self.summarizer.apply(remaining))
         snapshot = DigestSnapshot(
             target_date=target_date,
             fetched_at=source_result.fetched_at,
